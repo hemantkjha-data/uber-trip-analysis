@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Uber Trip Analysis — Hemant Kumar Jha</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#0b1220; --card:#121c33; --line:rgba(255,255,255,.09); --ink:#e7edf8; --mut:#93a3c4; --blue:#3b82f6; --gold:#d9ab52; --green:#34d399; --red:#f87171; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--ink); font-family:"Segoe UI",system-ui,sans-serif; padding:24px; }
+  .wrap { max-width:1240px; margin:0 auto; }
+  h1 { font-size:22px; } .sub { color:var(--mut); font-size:13px; margin-top:4px; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:12px; margin:16px 0; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+  .kpi .lbl { color:var(--mut); font-size:11px; letter-spacing:1.4px; text-transform:uppercase; font-weight:700; }
+  .kpi .val { font-size:23px; font-weight:800; margin-top:6px; color:#fff; }
+  .kpi .val small { font-size:13px; color:var(--mut); }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+  .panel h3 { font-size:13px; color:var(--mut); letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; font-weight:700; }
+  .chartbox { position:relative; height:260px; }
+  .wide { grid-column:1 / -1; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th { text-align:left; color:var(--mut); font-size:11px; letter-spacing:1px; text-transform:uppercase; padding:6px 8px; border-bottom:1px solid var(--line); }
+  td { padding:7px 8px; border-bottom:1px solid rgba(255,255,255,.05); }
+  td.num, th.num { text-align:right; }
+  .insight { border-left:3px solid var(--gold); background:rgba(217,171,82,.08); border-radius:0 12px 12px 0; padding:12px 14px; font-size:13px; line-height:1.6; color:#e8e2cf; }
+  .insight b { color:#fff; }
+  .foot { color:var(--mut); font-size:11.5px; margin-top:16px; line-height:1.6; }
+  @media (max-width:760px){ .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🚗 Uber Trip Analysis</h1>
+  <div class="sub">20,000 trips across 6 cities (2024–2025) · demand, pricing &amp; cancellations · Built by Hemant Kumar Jha</div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="panel wide">
+      <h3>💡 Operations Insight</h3>
+      <div class="insight" id="insightBox"></div>
+    </div>
+    <div class="panel wide"><h3>Trips &amp; Revenue by Hour of Day</h3><div class="chartbox"><canvas id="cHour"></canvas></div></div>
+    <div class="panel"><h3>Revenue by Vehicle Type</h3><div class="chartbox"><canvas id="cVehicle"></canvas></div></div>
+    <div class="panel"><h3>Trips by City</h3><div class="chartbox"><canvas id="cCity"></canvas></div></div>
+    <div class="panel"><h3>Monthly Revenue Trend</h3><div class="chartbox"><canvas id="cMonth"></canvas></div></div>
+    <div class="panel"><h3>Trip Status Mix</h3><div class="chartbox"><canvas id="cStatus"></canvas></div></div>
+    <div class="panel"><h3>Surged vs Normal Trips</h3><div class="chartbox"><canvas id="cSurge"></canvas></div></div>
+    <div class="panel wide"><h3>Vehicle Type Detail</h3><table id="tVeh"></table></div>
+  </div>
+
+  <div class="foot">
+    Pipeline: 20,000-row synthetic-but-realistic ride-hailing dataset → SQL aggregations (hour-of-day demand curves, surge cohorts, cancellation funnels)
+    → this dashboard. Peak-hour surge behaviour and driver-cancellation leakage are the two decision points.
+  </div>
+</div>
+
+<script>
+const AGG = {"kpi":{"completed":17786,"total":20000,"revenue":3789810,"avg_fare":213,"avg_km":11.2,"cancel_rate":11.1,"avg_rating":4.28,"avg_wait":4.4},"byHour":[{"hour":6,"trips":320,"revenue":57180,"avg_surge":1,"cancel_rate":0},{"hour":7,"trips":450,"revenue":77854,"avg_surge":1,"cancel_rate":4},{"hour":8,"trips":3171,"revenue":633848,"avg_surge":1.17,"cancel_rate":13.7},{"hour":9,"trips":2878,"revenue":551739,"avg_surge":1.22,"cancel_rate":14.2},{"hour":10,"trips":1169,"revenue":218678,"avg_surge":1,"cancel_rate":1.6},{"hour":12,"trips":905,"revenue":149686,"avg_surge":1,"cancel_rate":6.3},{"hour":14,"trips":902,"revenue":141113,"avg_surge":1,"cancel_rate":16.7},{"hour":17,"trips":1375,"revenue":204893,"avg_surge":1,"cancel_rate":10.9},{"hour":18,"trips":2781,"revenue":623440,"avg_surge":1.27,"cancel_rate":13.6},{"hour":19,"trips":3303,"revenue":656115,"avg_surge":1.22,"cancel_rate":8.5},{"hour":20,"trips":939,"revenue":176016,"avg_surge":1,"cancel_rate":8.1},{"hour":22,"trips":919,"revenue":126388,"avg_surge":1,"cancel_rate":12.2},{"hour":23,"trips":888,"revenue":172860,"avg_surge":1,"cancel_rate":14.9}],"byVehicle":[{"vehicle_type":"UberGo","trips":8085,"revenue":1424162,"avg_fare":201,"avg_km":10.9,"avg_rating":4.3},{"vehicle_type":"Premier","trips":3323,"revenue":900159,"avg_fare":294,"avg_km":11,"avg_rating":4.23},{"vehicle_type":"Auto","trips":4764,"revenue":704301,"avg_fare":168,"avg_km":11.2,"avg_rating":4.27},{"vehicle_type":"XL","trips":1614,"revenue":496863,"avg_fare":344,"avg_km":11.5,"avg_rating":4.29},{"vehicle_type":"Bike","trips":2214,"revenue":264325,"avg_fare":132,"avg_km":12.9,"avg_rating":4.29}],"byCity":[{"city":"Mumbai","trips":3763,"revenue":742969,"cancel_rate":12.5},{"city":"Pune","trips":3478,"revenue":663355,"cancel_rate":8.7},{"city":"Hyderabad","trips":3177,"revenue":612401,"cancel_rate":13.6},{"city":"Bangalore","trips":3254,"revenue":608318,"cancel_rate":9.2},{"city":"Delhi NCR","trips":3084,"revenue":589985,"cancel_rate":11},{"city":"Kolkata","trips":3244,"revenue":572782,"cancel_rate":11.4}],"byMonth":[{"ym":"2024-01","trips":958,"revenue":186230},{"ym":"2024-02","trips":886,"revenue":205900},{"ym":"2024-03","trips":506,"revenue":105050},{"ym":"2024-04","trips":795,"revenue":172752},{"ym":"2024-05","trips":902,"revenue":172226},{"ym":"2024-06","trips":563,"revenue":112707},{"ym":"2024-07","trips":635,"revenue":129881},{"ym":"2024-08","trips":790,"revenue":166716},{"ym":"2024-09","trips":715,"revenue":149975},{"ym":"2024-10","trips":979,"revenue":184563},{"ym":"2024-11","trips":918,"revenue":221358},{"ym":"2024-12","trips":832,"revenue":200500},{"ym":"2025-01","trips":599,"revenue":128429},{"ym":"2025-02","trips":601,"revenue":163042},{"ym":"2025-03","trips":620,"revenue":130748},{"ym":"2025-04","trips":621,"revenue":139554},{"ym":"2025-05","trips":642,"revenue":165654},{"ym":"2025-06","trips":790,"revenue":155989},{"ym":"2025-07","trips":641,"revenue":116506},{"ym":"2025-08","trips":753,"revenue":176346},{"ym":"2025-09","trips":698,"revenue":133227},{"ym":"2025-10","trips":729,"revenue":137130},{"ym":"2025-11","trips":901,"revenue":182629},{"ym":"2025-12","trips":712,"revenue":152698}],"surge":[{"grp":"Normal","trips":15413,"avg_fare":182,"cancel_rate":9.8},{"grp":"Surged","trips":4587,"avg_fare":323,"cancel_rate":15.2}],"status":[{"status":"Cancelled by Customer","trips":900,"pct":4.5},{"status":"Cancelled by Driver","trips":1314,"pct":6.6},{"status":"Completed","trips":17786,"pct":88.9}],"byPayment":[{"payment":"Card","trips":3618,"revenue":798395},{"payment":"Cash","trips":4189,"revenue":842118},{"payment":"UPI","trips":9979,"revenue":2149297}]};
+const inr = n => '₹' + Number(n).toLocaleString('en-IN');
+const $ = id => document.getElementById(id);
+const AXIS = { x:{ticks:{color:'#93a3c4'}}, y:{ticks:{color:'#93a3c4'}} };
+const LEG = { labels:{color:'#93a3c4'} };
+
+const k = AGG.kpi;
+$('kpis').innerHTML = [
+  ['Completed Trips', k.completed.toLocaleString('en-IN')],
+  ['Revenue', inr(k.revenue)],
+  ['Avg Fare', '₹' + k.avg_fare],
+  ['Avg Distance', k.avg_km + '<small> km</small>'],
+  ['Cancellation Rate', k.cancel_rate + '<small> %</small>'],
+  ['Avg Rating', k.avg_rating + '<small> ★</small>'],
+].map(x => '<div class="kpi"><div class="lbl">'+x[0]+'</div><div class="val">'+x[1]+'</div></div>').join('');
+
+const peak = AGG.byHour.reduce((a,x)=>x.revenue>a.revenue?x:a);
+const dCan = AGG.byHour.filter(x=>x.hour>=8&&x.hour<=9||x.hour>=18&&x.hour<=19);
+const peakCan = Math.round(dCan.reduce((a,x)=>a+x.cancel_rate*x.trips,0)/dCan.reduce((a,x)=>a+x.trips,0)*10)/10;
+const offCan = AGG.byHour.filter(x=>!(x.hour>=8&&x.hour<=9||x.hour>=18&&x.hour<=19));
+const offC = Math.round(offCan.reduce((a,x)=>a+x.cancel_rate*x.trips,0)/offCan.reduce((a,x)=>a+x.trips,0)*10)/10;
+const sAvg = AGG.surge.find(x=>x.grp==='Surged').avg_fare, nAvg = AGG.surge.find(x=>x.grp==='Normal').avg_fare;
+$('insightBox').innerHTML =
+  '<b>Demand peaks at ' + peak.hour + ':00 (' + inr(peak.revenue) + ' revenue in that hour-band)</b>, and peak hours are exactly where cancellations bite: '+
+  peakCan+'% in morning/evening rush vs '+offC+'% off-peak. Surge pricing adds ₹'+Math.round(sAvg-nAvg)+' per trip ('+sAvg+' vs '+nAvg+'), '+
+  'but every driver-cancelled ride during surge is lost revenue <i>and</i> a churned rider. '+
+  '<b>Recommendation: guarantee-hour incentives at 8–10am / 6–8pm</b> to cut driver cancellations where they hurt most.';
+
+new Chart($('cHour'), { type:'bar', data:{ labels:AGG.byHour.map(h=>h.hour+':00'), datasets:[
+  { label:'Revenue', data:AGG.byHour.map(h=>h.revenue), backgroundColor:'#3b82f6', borderRadius:4 },
+  { label:'Trips', data:AGG.byHour.map(h=>h.trips), type:'line', borderColor:'#d9ab52', tension:.35, yAxisID:'y' }]},
+  options:{ plugins:{legend:{labels:LEG.labels}}, scales:AXIS }});
+
+new Chart($('cVehicle'), { type:'doughnut', data:{ labels:AGG.byVehicle.map(v=>v.vehicle_type),
+  datasets:[{ data:AGG.byVehicle.map(v=>v.revenue), backgroundColor:['#3b82f6','#8b5cf6','#34d399','#d9ab52','#f472b6'] }]},
+  options:{ plugins:{legend:{position:'right',labels:LEG.labels}} }});
+
+new Chart($('cCity'), { type:'bar', data:{ labels:AGG.byCity.map(c=>c.city), datasets:[
+  { label:'Revenue', data:AGG.byCity.map(c=>c.revenue), backgroundColor:'#8b5cf6', borderRadius:6 }]},
+  options:{ plugins:{legend:{display:false}}, scales:{...AXIS, x:{ticks:{color:'#93a3c4', maxRotation:30}}} }});
+
+new Chart($('cMonth'), { type:'line', data:{ labels:AGG.byMonth.map(m=>m.ym), datasets:[
+  { label:'Revenue', data:AGG.byMonth.map(m=>m.revenue), borderColor:'#34d399', backgroundColor:'rgba(52,211,153,.12)', fill:true, tension:.3 }]},
+  options:{ plugins:{legend:{labels:LEG.labels}}, scales:AXIS }});
+
+new Chart($('cStatus'), { type:'doughnut', data:{ labels:AGG.status.map(s=>s.status),
+  datasets:[{ data:AGG.status.map(s=>s.trips), backgroundColor:['#34d399','#f87171','#fbbf24'] }]},
+  options:{ plugins:{legend:{position:'right',labels:LEG.labels}} }});
+
+const s = AGG.surge;
+new Chart($('cSurge'), { type:'bar', data:{ labels:s.map(x=>x.grp), datasets:[
+  { label:'Avg Fare', data:s.map(x=>x.avg_fare), backgroundColor:'#d9ab52', borderRadius:6 }]},
+  options:{ plugins:{legend:{display:false}}, scales:AXIS }});
+
+$('tVeh').innerHTML = '<tr><th>Vehicle</th><th class="num">Trips</th><th class="num">Revenue</th><th class="num">Avg Fare</th><th class="num">Avg km</th><th class="num">Rating</th></tr>' +
+  AGG.byVehicle.map(v=>'<tr><td>'+v.vehicle_type+'</td><td class="num">'+v.trips.toLocaleString('en-IN')+'</td><td class="num">'+inr(v.revenue)+'</td><td class="num">₹'+v.avg_fare+'</td><td class="num">'+v.avg_km+'</td><td class="num">'+v.avg_rating+' ★</td></tr>').join('');
+</script>
+</body>
+</html>
